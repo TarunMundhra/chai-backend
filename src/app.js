@@ -6,7 +6,7 @@ import cookieParser from "cookie-parser"
 const app = express();
 
 app.use(cors({
-    origni : process.env.CORS_ORIGIN,
+    origin : process.env.CORS_ORIGIN,
     credentials : true
 }))
 
@@ -23,6 +23,11 @@ import userRouter from './routes/user.routes.js'
 
 //rouote destination
 
-app.use("api/v1/users",userRouter)
+app.use("/api/v1/users",userRouter)
+
+// Optional: 404 handler
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found" });
+});
 
 export {app}
