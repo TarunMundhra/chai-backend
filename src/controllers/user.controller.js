@@ -18,12 +18,12 @@ const registerUser = asyncHandler( async (req,res) => {
     console.log("email:",email)
     if(
         [email,fullName,username,password].some((field) =>
-        fields?.trim() === "")
+        field?.trim() === "")
     ){
         throw new ApiError(400,"All fields are required");
     }
 
-    const existedUser = User.findOne({
+    const existedUser = await User.findOne({
         $or: [ { username }, { email }]
     })
 
@@ -33,6 +33,10 @@ const registerUser = asyncHandler( async (req,res) => {
     // files fiels given by multer
     const avatarLocalPath = req.files?.avatar[0]?.path;
 
+    //debug avatar file not uploading
+    console.log("FILES RECEIVED:", req.files);
+
+
     const coverImageLocalPath = req.files?.coverImage[0]?.path;
 
     if(!avatarLocalPath){
@@ -40,7 +44,13 @@ const registerUser = asyncHandler( async (req,res) => {
     }
 
     const avatar = await uploadOnCloudnary(avatarLocalPath)
-    const coverImage = await uploadOnCloudnary(coverImageLocalPath)
+    // const coverImage = await uploadOnCloudnary(coverImageLocalPath)
+
+
+    let coverImageLocalPath;
+    if (req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0) {
+        coverImageLocalPath = req.files.coverImage[0].path
+    }
 
     if(!avatar){
         throw new ApiError(400,"Avatar file is required")
