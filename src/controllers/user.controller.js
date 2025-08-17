@@ -3,6 +3,7 @@ import { ApiError } from "../utils/apiError.js";
 import { User } from "../models/user.models.js";
 import { uploadOnCloudnary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/apiResponse.js";
+import jwt from "jsonwebtoken"
 
 const generateAccessTokenAndrefreshToken = async(userId) => {
     try {
@@ -181,8 +182,57 @@ const logoutUser = asyncHandler(async(req,res) =>{
     .clearCookie("refreshToken", options)
     .json(new ApiResponse(200,{},"User logged out successfully"))
 })
+
+const refreshAccessToken = asyncHandler(async(req,res) =>{
+    const incomingRefeshToken = req.cookies.refreshToken 
+    || req.body.refreshToken //req.body for mobile application
+    if(!incomingRefeshToken){
+        throw new ApiError(401,"Invalid RefreshError during regenerating access token")
+    }
+
+    try {
+        const decodedRefreshToken = jwt.verify(
+            incomingRefeshToken,
+            process.env.REFRESH_TOKEN_SECRET
+        )
+    
+        const user = await User.findById(decodedRefreshToken?._id)
+    
+        if(!user){
+            throw new ApiError(401,"user not found while regenerating access token")
+        }
+    
+    
+        if(incomingRefeshToken !== user?.refreshToken){
+            throw new ApiError(401,"refresh token is expired or used")
+        }
+    
+        const options = {
+            httpOnly :  true,
+            sucure : true
+        }
+    
+        const { accessToken , refreshToken }  = await generateAccessTokenAndrefreshToken(user._id)
+    
+        return res
+        .status(200)
+        .cookie("accessToken",accessToken,options)
+        .cookie("refreshToken",newRefreshToken,options)
+        .json(
+            new ApiResponse(
+                200,
+                {accessToken , refreshToken : newRefreshToken},
+                "Access token refreshed succussfully"
+            )
+        )
+    } catch (error) {
+        throw new ApiError(401,error?.message || 
+        "Invaild access token 222")
+    }
+})
 export {
     registerUser,
     loginUser,
-    logoutUser
+    logoutUser,
+    refreshAccessToken
 }
