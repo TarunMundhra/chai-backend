@@ -4,9 +4,9 @@ import { User } from "../models/user.models.js";
 import { uploadOnCloudnary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 
-const generateAccessTokenAndrefreshToken = async (userId) => {
+const generateAccessTokenAndrefreshToken = async(userId) => {
     try {
-        const user = User.findById(userId)
+        const user = await User.findById(userId)
         const accessToken = user.generateAccessToken()
         const refreshToken = user.generateRefreshToken()    
 
@@ -16,6 +16,7 @@ const generateAccessTokenAndrefreshToken = async (userId) => {
 
         return { accessToken , refreshToken }
     } catch (error) {
+        console.log(error);
         throw new ApiError(500,"Something went wrong while generating AccessToken or refreshToken")
     }
 }
@@ -103,7 +104,7 @@ const loginUser = asyncHandler(async(req,res) =>{
     
     const {email,username,password}  = req.body
 
-    if(!email || !username){
+    if(!(email || username)){
         throw new ApiError(400,"Either email or username is  required ")
     }
 
@@ -118,7 +119,7 @@ const loginUser = asyncHandler(async(req,res) =>{
         throw new ApiError(404,"User is not registered or found")
     }
 
-    const validatePassword = await isPasswordCorrect(password)
+    const validatePassword = await user.isPasswordCorrect(password)
 
     if(!validatePassword){
         throw new ApiError(401,"wrong user credentials")
@@ -128,7 +129,7 @@ const loginUser = asyncHandler(async(req,res) =>{
     generateAccessTokenAndrefreshToken(user._id)
 
 
-    const loggedInUser = User.findById(user._id).
+    const loggedInUser =    await User.findById(user._id).
     select("-password -refreshToken")
 
     const options = {
@@ -144,7 +145,9 @@ const loginUser = asyncHandler(async(req,res) =>{
         new ApiResponse(
             200,
             {
-                user : accessToken,loggedInUser,refreshToken
+                user: loggedInUser, 
+                accessToken: accessToken,
+                refreshToken: refreshToken
             },
             "user logged in successfully"
         )
