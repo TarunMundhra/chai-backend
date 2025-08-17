@@ -4,6 +4,22 @@ import { User } from "../models/user.models.js";
 import { uploadOnCloudnary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/apiResponse.js";
 
+const generateAccessTokenAndrefreshToken = async (userId) => {
+    try {
+        const user = User.findById(userId)
+        const accessToken = user.generateAccessToken()
+        const refreshToken = user.generateRefreshToken()    
+
+        user.refreshToken = refreshToken
+        //didnot understood
+        await user.save({validateBeforeSave : false})
+
+        return { accessToken , refreshToken }
+    } catch (error) {
+        throw new ApiError(500,"Something went wrong while generating AccessToken or refreshToken")
+    }
+}
+
 const registerUser = asyncHandler( async (req,res) => {
     //get details of the user from the frontend
     // validation - not empty
@@ -60,7 +76,7 @@ const registerUser = asyncHandler( async (req,res) => {
         fullName,
         avatar : avatar.url,
         coverImage : coverImage?.url || "",
-        email,
+        email,      
         password,
         username : username.toLowerCase()
     })
@@ -77,6 +93,93 @@ const registerUser = asyncHandler( async (req,res) => {
     )
 })
 
+const loginUser = asyncHandler(async(req,res) =>{
+    // req.body -> data
+    // username or email
+    // find the user
+    //password check
+    //access and refresh token renegrate 
+    // send cookie
+    
+    const {email,username,password}  = req.body
+
+    if(!email || !username){
+        throw new ApiError(400,"Either email or username is  required ")
+    }
+
+
+    //why colon and curly braces required search 
+    // see criteria for 'new' before methods
+    const user = await User.findOne({
+        $or : [{email},{username}]
+    })
+
+    if(!user){
+        throw new ApiError(404,"User is not registered or found")
+    }
+
+    const validatePassword = await isPasswordCorrect(password)
+
+    if(!validatePassword){
+        throw new ApiError(401,"wrong user credentials")
+    }
+
+    const {accessToken,refreshToken} = await 
+    generateAccessTokenAndrefreshToken(user._id)
+
+
+    const loggedInUser = User.findById(user._id).
+    select("-password -refreshToken")
+
+    const options = {
+        httpOnly : true, // allows only server to modify cookies 
+        sucure : true
+    }
+
+    return res
+    .status(200)
+    .cookie("refreshToken", refreshToken,options)
+    .cookie("accessToken",accessToken,options)
+    .json(
+        new ApiResponse(
+            200,
+            {
+                user : accessToken,loggedInUser,refreshToken
+            },
+            "user logged in successfully"
+        )
+    )
+
+})
+
+
+const logoutUser = asyncHandler(async(req,res) =>{
+    //req.user._id //.user created during jwtverify similar to req.body and req.cookie
+     await  User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set : {
+                refreshToken : undefined
+            }
+        },
+        {
+            new : true
+        }
+    )
+
+    const options = {
+        httpOnly : true, // allows only server to modify cookies 
+        sucure : true
+    }
+
+    return res
+    .status(200)
+    .clearCookie("accessToken" , options)
+    .clearCookie("refreshToken", options)
+    .json(new ApiResponse(200,{},"User logged out successfully"))
+})
 export {
     registerUser,
+    loginUser,
+    logoutUser
 }
